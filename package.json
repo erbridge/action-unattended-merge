@@ -1,7 +1,9 @@
 {
-  "name": "javascript-action",
-  "version": "1.0.0",
-  "description": "JavaScript Action Template",
+  "name": "action-unattended-merge",
+  "version": "0.0.1",
+  "description": "Automatically merge PRs",
+  "license": "MIT",
+  "repository": "erbridge/action-unattended-merge",
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
@@ -9,21 +11,6 @@
     "test": "jest",
     "all": "npm run lint && npm run prepare && npm run test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/actions/javascript-action.git"
-  },
-  "keywords": [
-    "GitHub",
-    "Actions",
-    "JavaScript"
-  ],
-  "author": "",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/actions/javascript-action/issues"
-  },
-  "homepage": "https://github.com/actions/javascript-action#readme",
   "dependencies": {
     "@actions/core": "^1.2.5"
   },
