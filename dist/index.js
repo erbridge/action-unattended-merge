@@ -7,6 +7,7 @@ require('./sourcemap-register.js');module.exports =
 
 const core = __nccwpck_require__(186);
 const github = __nccwpck_require__(438);
+const checkAutomergeLabels = __nccwpck_require__(502);
 const init = __nccwpck_require__(17);
 const validate = __nccwpck_require__(2);
 
@@ -31,10 +32,24 @@ async function run() {
 
     core.info("Initializing GitHub API...");
     const token = core.getInput("repo-token");
-    const { failure } = init(token);
+    const { octokit, failure } = init(token);
 
     if (failure) {
       throw new Error(failure);
+    }
+
+    core.info("Checking PR for automerge labels...");
+    const automergeLabels = core.getInput("automerge-labels");
+
+    const { found } = await checkAutomergeLabels(
+      octokit,
+      github.context,
+      automergeLabels
+    );
+
+    if (!found) {
+      core.info("PR is not ready to merge!");
+      return;
     }
   } catch (error) {
     core.setFailed(error.message);
@@ -5975,6 +5990,33 @@ function wrappy (fn, cb) {
     return ret
   }
 }
+
+
+/***/ }),
+
+/***/ 502:
+/***/ ((module) => {
+
+module.exports = async function checkAutomergeLabels(
+  octokit,
+  context,
+  labels = []
+) {
+  const output = { found: [] };
+
+  if (labels && labels.length > 0) {
+    const { data: pullRequest } = await octokit.pulls.get({
+      ...context.repo,
+      pull_number: context.issue.number,
+    });
+
+    const prLabels = pullRequest.labels.map((label) => label.name);
+
+    output.found = labels.filter((label) => prLabels.includes(label));
+  }
+
+  return output;
+};
 
 
 /***/ }),

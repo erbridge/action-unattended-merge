@@ -4,6 +4,12 @@ description:
   Automatically merge PRs where intent to merge is shown once all required
   checks pass
 inputs:
+  automerge-labels:
+    description:
+      a list of labels to automatically merge without any other indication of
+      intent (if allowed by branch protection rules)
+    required: false
+    default: []
   repo-token:
     description:
       a personal access token with at least write permission to the repository
