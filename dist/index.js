@@ -7,6 +7,7 @@ require('./sourcemap-register.js');module.exports =
 
 const core = __nccwpck_require__(186);
 const github = __nccwpck_require__(438);
+const init = __nccwpck_require__(17);
 const validate = __nccwpck_require__(2);
 
 async function run() {
@@ -27,6 +28,14 @@ async function run() {
     }
 
     core.info("Running...");
+
+    core.info("Initializing GitHub API...");
+    const token = core.getInput("repo-token");
+    const { failure } = init(token);
+
+    if (failure) {
+      throw new Error(failure);
+    }
   } catch (error) {
     core.setFailed(error.message);
   }
@@ -5966,6 +5975,29 @@ function wrappy (fn, cb) {
     return ret
   }
 }
+
+
+/***/ }),
+
+/***/ 17:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const github = __nccwpck_require__(438);
+
+module.exports = function init(token) {
+  const output = {};
+
+  if (token) {
+    output.octokit = github.getOctokit(token, {
+      userAgent: "erbridge/action-unattended-merge",
+    });
+  } else {
+    output.failure =
+      "You must set `repo-token: <personal-access-token>` in your workflow configuration to use this action";
+  }
+
+  return output;
+};
 
 
 /***/ }),
