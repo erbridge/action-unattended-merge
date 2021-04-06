@@ -4,6 +4,10 @@ description:
   Automatically merge PRs where intent to merge is shown once all required
   checks pass
 inputs:
+  repo-token:
+    description:
+      a personal access token with at least write permission to the repository
+    required: true
   strict:
     description: whether to fail when running in an invalid context or not
     required: false

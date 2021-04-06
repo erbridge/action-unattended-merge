@@ -1,6 +1,7 @@
 const core = require("@actions/core");
 const github = require("@actions/github");
 const yn = require("yn");
+const init = require("./src/init");
 const validate = require("./src/validate");
 
 async function run() {
@@ -21,6 +22,14 @@ async function run() {
     }
 
     core.info("Running...");
+
+    core.info("Initializing GitHub API...");
+    const token = core.getInput("repo-token");
+    const { failure } = init(token);
+
+    if (failure) {
+      throw new Error(failure);
+    }
   } catch (error) {
     core.setFailed(error.message);
   }
