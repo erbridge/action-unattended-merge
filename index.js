@@ -1,6 +1,7 @@
 const core = require("@actions/core");
 const github = require("@actions/github");
 const yn = require("yn");
+const checkAutomergeLabels = require("./src/checkAutomergeLabels");
 const init = require("./src/init");
 const validate = require("./src/validate");
 
@@ -25,10 +26,24 @@ async function run() {
 
     core.info("Initializing GitHub API...");
     const token = core.getInput("repo-token");
-    const { failure } = init(token);
+    const { octokit, failure } = init(token);
 
     if (failure) {
       throw new Error(failure);
+    }
+
+    core.info("Checking PR for automerge labels...");
+    const automergeLabels = core.getInput("automerge-labels").split(/\s*,\s*/);
+
+    const { found } = await checkAutomergeLabels(
+      octokit,
+      github.context,
+      automergeLabels
+    );
+
+    if (!found) {
+      core.info("PR is not ready to merge!");
+      return;
     }
   } catch (error) {
     core.setFailed(error.message);
