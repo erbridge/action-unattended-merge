@@ -9,6 +9,7 @@ const core = __nccwpck_require__(186);
 const github = __nccwpck_require__(438);
 const checkAutomergeLabels = __nccwpck_require__(502);
 const init = __nccwpck_require__(17);
+const merge = __nccwpck_require__(900);
 const validate = __nccwpck_require__(2);
 
 async function run() {
@@ -50,6 +51,14 @@ async function run() {
     if (!found) {
       core.info("PR is not ready to merge!");
       return;
+    }
+
+    const { alreadyMerged } = await merge(octokit, github.context);
+
+    if (alreadyMerged) {
+      core.warning("PR was already merged!");
+    } else {
+      core.info("Done!");
     }
   } catch (error) {
     core.setFailed(error.message);
@@ -6036,6 +6045,32 @@ module.exports = function init(token) {
   } else {
     output.failure =
       "You must set `repo-token: <personal-access-token>` in your workflow configuration to use this action";
+  }
+
+  return output;
+};
+
+
+/***/ }),
+
+/***/ 900:
+/***/ ((module) => {
+
+module.exports = async function merge(octokit, context) {
+  const output = {};
+
+  const { status } = await octokit.pulls.checkIfMerged({
+    ...context.repo,
+    pull_number: context.issue.number,
+  });
+
+  if (status === 204) {
+    output.alreadyMerged = true;
+  } else {
+    await octokit.pulls.merge({
+      ...context.repo,
+      pull_number: context.issue.number,
+    });
   }
 
   return output;
