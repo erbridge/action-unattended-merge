@@ -1,0 +1,44 @@
+on:
+  - pull_request
+
+env:
+  ACTION_NAME: erbridge/action-unattended-merge
+  ACTION_GITHUB_TOKEN: ${{ secrets.ACTION_GITHUB_TOKEN }}
+
+jobs:
+  set-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set ref to test
+        run: |
+          export REF=$(
+            git rev-list --format=%B --max-count=1 HEAD \
+            | grep "$ACTION_NAME" \
+            | cut -d "@" -f2
+          )
+          echo "::set-output name=ref::$REF"
+
+  test-run:
+    needs: set-ref
+    runs-on: ubuntu-latest
+    env:
+      ACTION_REF: ${{ needs.set-ref.outputs.ref }}
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v2
+
+      - name: Checkout action repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ env.ACTION_NAME }}
+          ref: ${{ env.ACTION_REF }}
+          token: ${{ env.ACTION_GITHUB_TOKEN }}
+          path: action/
+
+      - name: Test fast-forwarding
+        uses: ./action/
+        with:
+          automerge-labels: automerge
+          repo-token: ${{ github.token }}
