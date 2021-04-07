@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+
+# This script assumes it's being run in a GitHub Actions workflow with the
+# following environment variables set:
+#
+#   - TEST_GITHUB_TOKEN
+#   - TEST_NAME
+#   - TEST_REPOSITORY
+
+set -e
+set -o pipefail
+
+TEST_SOURCE="$GITHUB_WORKSPACE/test/$TEST_NAME/"
+BASE_BRANCH="test/$TEST_NAME/$GITHUB_REPOSITORY/$GITHUB_SHA/base"
+HEAD_BRANCH="test/$TEST_NAME/$GITHUB_REPOSITORY/$GITHUB_SHA/head"
+
+cd "$TEST_WORKSPACE"
+
+function check-pr() {
+  gh pr checks "$HEAD_BRANCH" --repo "$TEST_REPOSITORY" | grep -c "test	$1"
+}
+
+function fail-test() {
+  echo "::error::$TEST_NAME $1"
+  gh pr close "$HEAD_BRANCH" --repo "$TEST_REPOSITORY"
+  exit 1
+}
+
+function wait-for-pr-status() {
+  # Wait for checks to start
+  MAX_RETRY=5
+  COUNTER=0
+  until [ "$(check-pr pending)" -gt 0 ]; do
+    sleep 1
+
+    if [ $COUNTER = $MAX_RETRY ]; then
+      fail-test "timed out! No checks started"
+    fi
+
+    echo "Checking again: retry #$COUNTER"
+    ((COUNTER++))
+  done
+
+  # Wait for checks to finish
+  MAX_RETRY=5
+  COUNTER=0
+  until [ "$(check-pr pending)" = 0 ]; do
+    sleep 10
+
+    if [ $COUNTER = $MAX_RETRY ]; then
+      fail-test "timed out! Checks did not complete"
+    fi
+
+    echo "Checking again: retry #$COUNTER"
+    ((COUNTER++))
+  done
+
+  # Check if any checks failed
+  if [ "$(check-pr fail)" -gt 0 ]; then
+    fail-test "failed! Checks failed"
+  fi
+
+  # Check if anything changed as a consequence of the checks
+  git fetch origin
+  if [ "$(git rev-parse "$HEAD_BRANCH")" != "$(git rev-parse "origin/$HEAD_BRANCH")" ]; then
+    fail-test "failed! Checks caused unwanted changes"
+  fi
+
+  echo "Success!"
+}
+
+function kick-pr() {
+  # Trigger a new workflow run by recommitting the head commit and force pushing
+  git checkout "$HEAD_BRANCH"
+  git commit --amend --no-edit
+  git push --force origin "$HEAD_BRANCH"
+}
+
+function check-merge() {
+  git fetch origin
+  if ! git merge-base --is-ancestor "$HEAD_BRANCH" "origin/$BASE_BRANCH"; then
+    fail-test "failed! PR was not merged"
+  fi
+}
+
+echo "::group::Set up gh"
+echo "$TEST_GITHUB_TOKEN" | gh auth login --with-token
+gh config set prompt disabled
+echo "::endgroup::"
+
+echo "::group::Set up respository"
+
+# Clean everything out of the default branch, to avoid any interference with the tests
+git clean -fdx
+git ls-files -z | xargs -0 rm -f
+
+# Create a test base branch
+git checkout -b "$BASE_BRANCH"
+cp -r "$TEST_SOURCE/base/*" ./
+git commit \
+  -m "Set up base commit for $TEST_NAME test" \
+  -m "Testing $GITHUB_REPOSITORY@$GITHUB_SHA"
+git push origin "$BASE_BRANCH"
+
+# Create a test head branch on top of the base branch
+git checkout -b "$HEAD_BRANCH" "$BASE_BRANCH"
+cp -rf "$TEST_SOURCE/head/*" ./
+git commit \
+  -m "Set up head commit for $TEST_NAME test" \
+  -m "Testing $GITHUB_REPOSITORY@$GITHUB_SHA"
+git push origin "$HEAD_BRANCH"
+
+echo "::endgroup::"
+echo "::group::Test unlabelled draft"
+
+# Create a draft pull request from the head branch to the base branch without any labels
+gh pr create \
+  --repo "$TEST_REPOSITORY" \
+  --base "$BASE_BRANCH" \
+  --head "$HEAD_BRANCH" \
+  --draft \
+  --title "Test $TEST_NAME for $GITHUB_REPOSITORY@$GITHUB_SHA"
+wait-for-pr-status
+
+echo "::endgroup::"
+echo "::group::Test labelled draft"
+
+# Add an automerge label to the draft pull request
+gh pr edit "$HEAD_BRANCH" --repo "$TEST_REPOSITORY" --add-label automerge
+kick-pr
+wait-for-pr-status
+
+echo "::endgroup::"
+echo "::group::Test labelled ready"
+
+# Mark the labelled draft pull request as ready
+gh pr ready "$HEAD_BRANCH" --repo "$TEST_REPOSITORY"
+kick-pr
+wait-for-pr-status
+check-merge
+
+echo "::endgroup::"
+
+echo "All success!"

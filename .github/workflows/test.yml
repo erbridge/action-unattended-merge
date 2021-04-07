@@ -5,8 +5,13 @@ on:
       - main
       - "releases/*"
 
+env:
+  TEST_GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
+  TEST_REPOSITORY: erbridge/action-unattended-merge-test
+  TEST_WORKSPACE: tmp/test/
+
 jobs:
-  test:
+  test-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -14,3 +19,21 @@ jobs:
       - run: npm run lint
       - run: npm run prepare
       - run: npm test
+
+  test-fast-forward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v2
+
+      - name: Checkout test repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ env.TEST_REPOSITORY }}
+          token: ${{ env.TEST_GITHUB_TOKEN }}
+          path: ${{ env.TEST_WORKSPACE }}
+
+      - name: Run automerge-by-label test
+        env:
+          TEST_NAME: fast-forward/automerge-by-label
+        run: test/bin/test-automerge-by-label

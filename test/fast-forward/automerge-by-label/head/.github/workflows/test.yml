@@ -1,0 +1,36 @@
+on:
+  pull_request:
+    branches:
+      - "test/fast-forward/automerge-by-label/*"
+
+env:
+  ACTION_NAME: erbridge/action-unattended-merge
+
+jobs:
+  set-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set ref to test
+        run: |
+          echo "::set-output name=ref::$(
+            git rev-list --format=%B --max-count=1 HEAD \
+            | grep "$ACTION_NAME" \
+            | cut -d "@" -f2
+          )"
+
+  test-run:
+    needs: set-ref
+    runs-on: ubuntu-latest
+    env:
+      ACTION_REF: ${{ jobs.set-ref.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Test fast-forwarding
+        uses: ${{ env.ACTION_NAME }}@${{ env.ACTION_REF }}
+        with:
+          automerge-labels:
+            - automerge
+          repo-token: ${{ env.GITHUB_TOKEN }}
