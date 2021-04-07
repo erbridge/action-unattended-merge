@@ -3,6 +3,7 @@ const github = require("@actions/github");
 const yn = require("yn");
 const checkAutomergeLabels = require("./src/checkAutomergeLabels");
 const init = require("./src/init");
+const merge = require("./src/merge");
 const validate = require("./src/validate");
 
 async function run() {
@@ -44,6 +45,14 @@ async function run() {
     if (!found) {
       core.info("PR is not ready to merge!");
       return;
+    }
+
+    const { alreadyMerged } = await merge(octokit, github.context);
+
+    if (alreadyMerged) {
+      core.warning("PR was already merged!");
+    } else {
+      core.info("Done!");
     }
   } catch (error) {
     core.setFailed(error.message);
